@@ -3,23 +3,32 @@ import type { Schedule } from '@/types/timesheet';
 import { STORAGE_KEYS } from '@/utils/constants';
 
 interface Settings {
-  schedule: Schedule;
+  schedules: Schedule[];   // indexed by job (0 = Job 1, 1 = Job 2, ...)
+  jobLabels: string[];     // e.g. ['TUT-NON GSHIP', 'READER-NON GSHIP']
   rememberMe: boolean;
 }
 
 interface SettingsContextValue extends Settings {
-  setSchedule: (s: Schedule) => void;
+  schedule: Schedule;                                     // alias for schedules[0]
+  setSchedule: (s: Schedule) => void;                     // alias for setJobSchedule(0, s)
+  setJobSchedule: (idx: number, s: Schedule) => void;
+  setJobLabels: (labels: string[]) => void;
   setRememberMe: (v: boolean) => void;
 }
 
 const SettingsContext = createContext<SettingsContextValue | null>(null);
 
-const EMPTY: Settings = { schedule: {}, rememberMe: true };
+const EMPTY: Settings = { schedules: [{}], jobLabels: [], rememberMe: true };
 
 function loadLocal(): Settings {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.SETTINGS);
-    if (raw) return JSON.parse(raw) as Settings;
+    if (raw) {
+      const parsed = JSON.parse(raw) as Partial<Settings & { schedule: Schedule }>;
+      // Migrate from old single-schedule format
+      if (parsed.schedules) return parsed as Settings;
+      if (parsed.schedule) return { ...EMPTY, ...parsed, schedules: [parsed.schedule], jobLabels: parsed.jobLabels ?? [] };
+    }
   } catch { /* ignore */ }
   return EMPTY;
 }
@@ -45,18 +54,17 @@ async function pushRemote(schedule: Schedule) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ schedule }),
     });
-  } catch { /* silent — localStorage is source of truth locally */ }
+  } catch { /* silent */ }
 }
 
 const SettingsProvider = ({ children }: { children: ReactNode }) => {
   const [settings, setSettings] = useState<Settings>(loadLocal);
 
-  // On mount: pull from KV and prefer it if non-empty
   useEffect(() => {
     fetchRemote().then((remote) => {
       if (remote && Object.keys(remote).length > 0) {
         setSettings((s) => {
-          const next = { ...s, schedule: remote };
+          const next = { ...s, schedules: [remote, ...s.schedules.slice(1)] };
           saveLocal(next);
           return next;
         });
@@ -64,11 +72,24 @@ const SettingsProvider = ({ children }: { children: ReactNode }) => {
     });
   }, []);
 
-  const setSchedule = useCallback((schedule: Schedule) => {
+  const setJobSchedule = useCallback((idx: number, schedule: Schedule) => {
     setSettings((s) => {
-      const next = { ...s, schedule };
+      const schedules = [...s.schedules];
+      while (schedules.length <= idx) schedules.push({});
+      schedules[idx] = schedule;
+      const next = { ...s, schedules };
       saveLocal(next);
-      pushRemote(schedule);
+      if (idx === 0) pushRemote(schedule);
+      return next;
+    });
+  }, []);
+
+  const setSchedule = useCallback((s: Schedule) => setJobSchedule(0, s), [setJobSchedule]);
+
+  const setJobLabels = useCallback((jobLabels: string[]) => {
+    setSettings((s) => {
+      const next = { ...s, jobLabels };
+      saveLocal(next);
       return next;
     });
   }, []);
@@ -81,11 +102,16 @@ const SettingsProvider = ({ children }: { children: ReactNode }) => {
     });
   }, []);
 
-  return (
-    <SettingsContext.Provider value={{ ...settings, setSchedule, setRememberMe }}>
-      {children}
-    </SettingsContext.Provider>
-  );
+  const value: SettingsContextValue = {
+    ...settings,
+    schedule: settings.schedules[0] ?? {},
+    setSchedule,
+    setJobSchedule,
+    setJobLabels,
+    setRememberMe,
+  };
+
+  return <SettingsContext.Provider value={value}>{children}</SettingsContext.Provider>;
 };
 
 const useSettings = (): SettingsContextValue => {

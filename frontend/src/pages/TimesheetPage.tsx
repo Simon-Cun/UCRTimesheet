@@ -73,9 +73,8 @@ function useRelativeTime(date: Date | null): string {
   return label;
 }
 
-function tabLabel(job: JobInfo): string {
-  if (job.position) return job.position;
-  return job.label || job.jobCode || 'Job';
+function tabLabel(job: JobInfo) {
+  return job.position || job.label || job.jobCode || 'Job';
 }
 
 const TimesheetPage = () => {
@@ -90,10 +89,24 @@ const TimesheetPage = () => {
   const [activeJobIdx, setActiveJobIdx] = useState(0);
   const refreshLabel = useRelativeTime(lastRefreshed);
 
-  const activeDays = DAYS_OF_WEEK.filter((d) => settings.schedule[d]?.length > 0);
   const jobs = current?.jobs ?? [];
   const multiJob = jobs.length > 1;
   const activeJob = jobs[activeJobIdx] ?? jobs[0];
+  const activeSchedule = settings.schedules[activeJobIdx] ?? {};
+  const activeDays = DAYS_OF_WEEK.filter((d) => activeSchedule[d]?.length > 0);
+
+  // Sync job labels to settings whenever current loads
+  useEffect(() => {
+    if (current?.jobs && current.jobs.length > 0) {
+      const labels = current.jobs.map((j) => j.position || j.label || j.jobCode);
+      settings.setJobLabels(labels);
+    }
+  }, [current?.jobs]);
+
+  const getHours = (row: DayRow) => {
+    if (activeJob?.jobKey && row.jobHours) return row.jobHours[activeJob.jobKey] ?? '';
+    return row.hoursDisplay ?? '';
+  };
 
   const fetchCurrent = async (forceRefresh = false) => {
     setCurrentLoading(true);
@@ -117,14 +130,15 @@ const TimesheetPage = () => {
 
   const handleSave = async () => {
     reset();
-    const result = await save(settings.schedule);
+    const result = await save(activeSchedule, activeJob?.jobKey);
     if (result.success) fetchCurrent();
   };
 
   const startEdit = async (row: DayRow) => {
     setEdit({ nDate: row.nDate, entries: [], loading: true, saving: false });
     try {
-      const res = await fetch(`/api/timesheet/day?nDate=${row.nDate}`, { credentials: 'include' });
+      const jobParam = activeJob?.jobKey ? `&jobKey=${encodeURIComponent(activeJob.jobKey)}` : '';
+      const res = await fetch(`/api/timesheet/day?nDate=${row.nDate}${jobParam}`, { credentials: 'include' });
       const data = await res.json() as { entries: TimeEntry[] };
       setEdit((e) => e ? { ...e, entries: data.entries.length > 0 ? data.entries : [{ ...BLANK }], loading: false } : null);
     } catch {
@@ -142,7 +156,7 @@ const TimesheetPage = () => {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nDate: edit.nDate, entries: edit.entries }),
+        body: JSON.stringify({ nDate: edit.nDate, entries: edit.entries, jobKey: activeJob?.jobKey }),
       });
       setEdit(null);
       fetchCurrent();
@@ -156,14 +170,14 @@ const TimesheetPage = () => {
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ nDate, entries: [] }),
+      body: JSON.stringify({ nDate, entries: [], jobKey: activeJob?.jobKey }),
     });
     fetchCurrent();
   };
 
   const clearAll = async () => {
     if (!current) return;
-    const filled = current.dayRows.filter((r) => r.hoursDisplay);
+    const filled = current.dayRows.filter((r) => getHours(r));
     if (filled.length === 0) return;
     setClearingAll(true);
     await Promise.all(
@@ -172,7 +186,7 @@ const TimesheetPage = () => {
           method: 'POST',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ nDate: r.nDate, entries: [] }),
+          body: JSON.stringify({ nDate: r.nDate, entries: [], jobKey: activeJob?.jobKey }),
         })
       )
     );
@@ -182,32 +196,23 @@ const TimesheetPage = () => {
 
   const inputClass = 'border border-neutral-gray200 rounded-md px-sm py-xs text-sm text-neutral-gray800 focus:outline-none focus:border-primary-blue focus:ring-1 focus:ring-primary-blue';
 
-  // Determine hours display for a row based on active tab
-  const getHours = (row: DayRow) => {
-    if (!activeJob) return row.hoursDisplay;
-    return row.jobHours?.[activeJob.jobKey] ?? row.hoursDisplay ?? '';
-  };
-
-  // Edit/clear only applies to Job 1 (index 0)
-  const canEdit = activeJobIdx === 0;
-
   return (
     <div className="flex-1 bg-neutral-gray100 overflow-y-auto h-full">
       <div className="w-full max-w-4xl mx-auto px-lg py-lg flex flex-col gap-md">
 
-        {/* Header */}
         <div>
           <h2 className="text-2xl font-bold text-neutral-gray800">Home</h2>
           <p className="text-sm text-neutral-gray500 mt-xs">Current biweekly period</p>
         </div>
 
-        {/* Two-column layout */}
         <div className="flex flex-col lg:flex-row gap-lg items-center lg:items-start">
 
-          {/* Left column: schedule + save */}
+          {/* Left: schedule preview + save */}
           <div className="flex flex-col gap-md w-full lg:flex-1 lg:min-w-0">
             <Card>
-              <h3 className="text-xs font-semibold text-neutral-gray500 uppercase tracking-widest mb-md">Your Schedule</h3>
+              <h3 className="text-xs font-semibold text-neutral-gray500 uppercase tracking-widest mb-md">
+                {activeJob ? `${tabLabel(activeJob)} Schedule` : 'Your Schedule'}
+              </h3>
               {activeDays.length === 0 ? (
                 <p className="text-sm text-neutral-gray500 text-center py-md">No days configured. Go to Settings.</p>
               ) : (
@@ -216,7 +221,7 @@ const TimesheetPage = () => {
                     <div key={day} className="flex items-center justify-between py-xs">
                       <span className="text-sm font-medium text-neutral-gray800 w-28">{day}</span>
                       <div className="flex flex-col items-end gap-xs">
-                        {settings.schedule[day].map((e, i) => (
+                        {activeSchedule[day].map((e, i) => (
                           <span key={i} className="text-sm text-neutral-gray600 font-mono">
                             {e.timeIn} {e.ampmIn} – {e.timeOut} {e.ampmOut}
                           </span>
@@ -248,21 +253,18 @@ const TimesheetPage = () => {
             />
           </div>
 
-          {/* Right column: current period */}
+          {/* Right: current period */}
           <div className="flex flex-col gap-md w-full lg:flex-1 lg:min-w-0">
             <Card>
-              {/* Card header */}
               <div className="flex items-center justify-between mb-md">
                 <div>
                   <h3 className="text-xs font-semibold text-neutral-gray500 uppercase tracking-widest">
                     {current?.periodLabel ?? 'Current Period'}
                   </h3>
-                  {refreshLabel && (
-                    <p className="text-xs text-neutral-gray400 mt-xs">{refreshLabel}</p>
-                  )}
+                  {refreshLabel && <p className="text-xs text-neutral-gray400 mt-xs">{refreshLabel}</p>}
                 </div>
                 <div className="flex items-center gap-sm">
-                  {canEdit && current?.dayRows.some((r) => r.hoursDisplay) && (
+                  {current?.dayRows.some((r) => getHours(r)) && (
                     <button onClick={clearAll} disabled={clearingAll}
                       className="text-xs text-semantic-error hover:opacity-80 disabled:opacity-40 font-medium">
                       {clearingAll ? 'Clearing...' : 'Clear all'}
@@ -275,38 +277,36 @@ const TimesheetPage = () => {
                 </div>
               </div>
 
-              {/* Job tabs — only shown when there are multiple jobs */}
+              {/* Job tabs */}
               {multiJob && current && (
-                <div className="flex gap-xs mb-md border-b border-neutral-gray200 pb-xs">
+                <div className="flex gap-xs mb-md border-b border-neutral-gray200">
                   {jobs.map((job, idx) => (
-                    <button
-                      key={job.jobKey || idx}
+                    <button key={job.jobKey || idx}
                       onClick={() => { setActiveJobIdx(idx); setEdit(null); }}
-                      className={`text-xs font-medium px-sm py-xs rounded-t-md transition-colors ${
+                      className={`text-xs font-medium px-sm py-xs transition-colors border-b-2 -mb-px ${
                         activeJobIdx === idx
-                          ? 'text-primary-blue border-b-2 border-primary-blue -mb-[9px] pb-[calc(theme(spacing.xs)+1px)]'
-                          : 'text-neutral-gray500 hover:text-neutral-gray800'
-                      }`}
-                    >
+                          ? 'text-primary-blue border-primary-blue'
+                          : 'text-neutral-gray500 border-transparent hover:text-neutral-gray800'
+                      }`}>
                       {tabLabel(job)}
                     </button>
                   ))}
                 </div>
               )}
 
-              {/* Loading / error states */}
               {currentLoading && !current && <p className="text-sm text-neutral-gray400 text-center py-md">Loading...</p>}
               {!currentLoading && !current && sessionExpired && (
                 <div className="text-center py-md">
                   <p className="text-sm text-neutral-gray600 font-medium">Session expired</p>
-                  <p className="text-xs text-neutral-gray400 mt-xs">Visit <a href="https://timesheet.ucr.edu" target="_blank" rel="noreferrer" className="text-primary-blue underline">timesheet.ucr.edu</a> to refresh your session via the extension.</p>
+                  <p className="text-xs text-neutral-gray400 mt-xs">
+                    Visit <a href="https://timesheet.ucr.edu" target="_blank" rel="noreferrer" className="text-primary-blue underline">timesheet.ucr.edu</a> to refresh your session via the extension.
+                  </p>
                 </div>
               )}
               {!currentLoading && !current && !sessionExpired && (
                 <p className="text-sm text-neutral-gray400 text-center py-md">Could not load timesheet</p>
               )}
 
-              {/* Day rows */}
               {current && current.dayRows.length === 0 && (
                 <p className="text-sm text-neutral-gray400 text-center py-md">No timesheets available</p>
               )}
@@ -332,7 +332,7 @@ const TimesheetPage = () => {
                             <span className="text-xs text-neutral-gray500 font-mono">
                               {hours || (isHoliday && !inSchedule ? 'Holiday' : '—')}
                             </span>
-                            {canEdit && !isEditing && (
+                            {!isEditing && (
                               <button onClick={() => startEdit(row)}
                                 className="text-neutral-gray400 hover:text-primary-blue transition-colors"
                                 title="Edit hours">
@@ -342,8 +342,7 @@ const TimesheetPage = () => {
                           </div>
                         </div>
 
-                        {/* Inline editor (Job 1 only) */}
-                        {isEditing && canEdit && (
+                        {isEditing && (
                           <div className="px-sm pb-sm flex flex-col gap-sm">
                             {edit.loading ? (
                               <p className="text-xs text-neutral-gray400 py-xs">Loading current times...</p>
@@ -387,7 +386,7 @@ const TimesheetPage = () => {
                                     className="text-xs text-neutral-gray500 hover:text-neutral-gray800 px-sm py-xs">
                                     Cancel
                                   </button>
-                                  {row.hoursDisplay && (
+                                  {hours && (
                                     <button onClick={() => { cancelEdit(); clearDay(row.nDate); }}
                                       className="text-xs text-semantic-error hover:underline ml-auto">
                                       Clear day
@@ -402,7 +401,6 @@ const TimesheetPage = () => {
                     );
                   })}
 
-                  {/* Legend */}
                   <div className="flex items-center gap-md mt-sm pt-sm border-t border-neutral-gray100 flex-wrap">
                     <div className="flex items-center gap-xs">
                       <span className="w-3 h-3 rounded-sm bg-semantic-success-light border border-semantic-success inline-block" />

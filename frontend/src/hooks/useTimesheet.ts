@@ -5,7 +5,7 @@ import { useAuth } from '@/context/AuthContext';
 interface UseTimesheetReturn {
   status: SaveStatus;
   error: string | null;
-  save: (schedule: Schedule) => Promise<SaveResult>;
+  save: (schedule: Schedule, jobKey?: string) => Promise<SaveResult>;
   reset: () => void;
 }
 
@@ -15,7 +15,7 @@ export function useTimesheet(): UseTimesheetReturn {
   const [error, setError] = useState<string | null>(null);
 
   const save = useCallback(
-    async (schedule: Schedule): Promise<SaveResult> => {
+    async (schedule: Schedule, jobKey?: string): Promise<SaveResult> => {
       setStatus('saving');
       setError(null);
 
@@ -24,14 +24,12 @@ export function useTimesheet(): UseTimesheetReturn {
           method: 'POST',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ schedule }),
+          body: JSON.stringify({ schedule, ...(jobKey ? { jobKey } : {}) }),
         });
 
         if (res.status === 401) {
           const reAuthed = await auth.silentReAuth();
-          if (reAuthed) {
-            return save(schedule);
-          }
+          if (reAuthed) return save(schedule, jobKey);
           setStatus('error');
           setError('Session expired. Please sign in again.');
           return { success: false, error: 'Session expired' };
@@ -57,10 +55,7 @@ export function useTimesheet(): UseTimesheetReturn {
     [auth]
   );
 
-  const reset = useCallback(() => {
-    setStatus('idle');
-    setError(null);
-  }, []);
+  const reset = useCallback(() => { setStatus('idle'); setError(null); }, []);
 
   return { status, error, save, reset };
 }
