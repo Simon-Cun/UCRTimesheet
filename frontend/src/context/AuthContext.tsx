@@ -52,6 +52,7 @@ const AuthProvider = ({ children }: { children: ReactNode }) => {
     const params = new URLSearchParams(window.location.search);
     const appCookie = params.get('appCookie');
     const username = params.get('username');
+    const cookies = params.get('cookies') ?? '';
 
     if (appCookie && username) {
       window.history.replaceState({}, '', window.location.pathname);
@@ -60,7 +61,7 @@ const AuthProvider = ({ children }: { children: ReactNode }) => {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ appCookie, username }),
+        body: JSON.stringify({ appCookie, username, cookies }),
       })
         .then((r) => r.json())
         .then((data: { success: boolean; username?: string }) => {
