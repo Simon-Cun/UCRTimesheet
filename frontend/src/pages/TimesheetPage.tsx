@@ -5,17 +5,26 @@ import { useSettings } from '@/context/SettingsContext';
 import { useTimesheet } from '@/hooks/useTimesheet';
 import { DAYS_OF_WEEK, type TimeEntry } from '@/types/timesheet';
 
+interface JobInfo {
+  jobKey: string;
+  jobCode: string;
+  label: string;
+  position: string;
+}
+
 interface DayRow {
   dayName: string;
   nDate: string;
   isHoliday: string;
   hoursDisplay: string;
+  jobHours: Record<string, string>;
   dateLabel: string;
 }
 
 interface CurrentTimesheet {
   periodLabel: string;
   dayRows: DayRow[];
+  jobs: JobInfo[];
 }
 
 interface EditState {
@@ -64,6 +73,11 @@ function useRelativeTime(date: Date | null): string {
   return label;
 }
 
+function tabLabel(job: JobInfo): string {
+  if (job.position) return job.position;
+  return job.label || job.jobCode || 'Job';
+}
+
 const TimesheetPage = () => {
   const settings = useSettings();
   const { status, error, save, reset } = useTimesheet();
@@ -73,9 +87,13 @@ const TimesheetPage = () => {
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
   const [clearingAll, setClearingAll] = useState(false);
   const [edit, setEdit] = useState<EditState | null>(null);
+  const [activeJobIdx, setActiveJobIdx] = useState(0);
   const refreshLabel = useRelativeTime(lastRefreshed);
 
   const activeDays = DAYS_OF_WEEK.filter((d) => settings.schedule[d]?.length > 0);
+  const jobs = current?.jobs ?? [];
+  const multiJob = jobs.length > 1;
+  const activeJob = jobs[activeJobIdx] ?? jobs[0];
 
   const fetchCurrent = async (forceRefresh = false) => {
     setCurrentLoading(true);
@@ -164,6 +182,15 @@ const TimesheetPage = () => {
 
   const inputClass = 'border border-neutral-gray200 rounded-md px-sm py-xs text-sm text-neutral-gray800 focus:outline-none focus:border-primary-blue focus:ring-1 focus:ring-primary-blue';
 
+  // Determine hours display for a row based on active tab
+  const getHours = (row: DayRow) => {
+    if (!activeJob) return row.hoursDisplay;
+    return row.jobHours?.[activeJob.jobKey] ?? row.hoursDisplay ?? '';
+  };
+
+  // Edit/clear only applies to Job 1 (index 0)
+  const canEdit = activeJobIdx === 0;
+
   return (
     <div className="flex-1 bg-neutral-gray100 overflow-y-auto h-full">
       <div className="w-full max-w-4xl mx-auto px-lg py-lg flex flex-col gap-md">
@@ -179,7 +206,6 @@ const TimesheetPage = () => {
 
           {/* Left column: schedule + save */}
           <div className="flex flex-col gap-md w-full lg:flex-1 lg:min-w-0">
-            {/* Schedule preview */}
             <Card>
               <h3 className="text-xs font-semibold text-neutral-gray500 uppercase tracking-widest mb-md">Your Schedule</h3>
               {activeDays.length === 0 ? (
@@ -202,7 +228,6 @@ const TimesheetPage = () => {
               )}
             </Card>
 
-            {/* Save status */}
             {status === 'success' && (
               <div className="bg-semantic-success-light border border-semantic-success rounded-xl px-md py-md flex items-center gap-sm">
                 <span className="text-semantic-success"><CheckIcon /></span>
@@ -221,12 +246,12 @@ const TimesheetPage = () => {
               disabled={activeDays.length === 0 || status === 'saving'}
               onClick={handleSave}
             />
-
           </div>
 
           {/* Right column: current period */}
           <div className="flex flex-col gap-md w-full lg:flex-1 lg:min-w-0">
             <Card>
+              {/* Card header */}
               <div className="flex items-center justify-between mb-md">
                 <div>
                   <h3 className="text-xs font-semibold text-neutral-gray500 uppercase tracking-widest">
@@ -237,7 +262,7 @@ const TimesheetPage = () => {
                   )}
                 </div>
                 <div className="flex items-center gap-sm">
-                  {current?.dayRows.some((r) => r.hoursDisplay) && (
+                  {canEdit && current?.dayRows.some((r) => r.hoursDisplay) && (
                     <button onClick={clearAll} disabled={clearingAll}
                       className="text-xs text-semantic-error hover:opacity-80 disabled:opacity-40 font-medium">
                       {clearingAll ? 'Clearing...' : 'Clear all'}
@@ -250,6 +275,26 @@ const TimesheetPage = () => {
                 </div>
               </div>
 
+              {/* Job tabs — only shown when there are multiple jobs */}
+              {multiJob && current && (
+                <div className="flex gap-xs mb-md border-b border-neutral-gray200 pb-xs">
+                  {jobs.map((job, idx) => (
+                    <button
+                      key={job.jobKey || idx}
+                      onClick={() => { setActiveJobIdx(idx); setEdit(null); }}
+                      className={`text-xs font-medium px-sm py-xs rounded-t-md transition-colors ${
+                        activeJobIdx === idx
+                          ? 'text-primary-blue border-b-2 border-primary-blue -mb-[9px] pb-[calc(theme(spacing.xs)+1px)]'
+                          : 'text-neutral-gray500 hover:text-neutral-gray800'
+                      }`}
+                    >
+                      {tabLabel(job)}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Loading / error states */}
               {currentLoading && !current && <p className="text-sm text-neutral-gray400 text-center py-md">Loading...</p>}
               {!currentLoading && !current && sessionExpired && (
                 <div className="text-center py-md">
@@ -257,30 +302,37 @@ const TimesheetPage = () => {
                   <p className="text-xs text-neutral-gray400 mt-xs">Visit <a href="https://timesheet.ucr.edu" target="_blank" rel="noreferrer" className="text-primary-blue underline">timesheet.ucr.edu</a> to refresh your session via the extension.</p>
                 </div>
               )}
-              {!currentLoading && !current && !sessionExpired && <p className="text-sm text-neutral-gray400 text-center py-md">Could not load timesheet</p>}
+              {!currentLoading && !current && !sessionExpired && (
+                <p className="text-sm text-neutral-gray400 text-center py-md">Could not load timesheet</p>
+              )}
 
-              {current && (
+              {/* Day rows */}
+              {current && current.dayRows.length === 0 && (
+                <p className="text-sm text-neutral-gray400 text-center py-md">No timesheets available</p>
+              )}
+
+              {current && current.dayRows.length > 0 && (
                 <div className="flex flex-col gap-xs">
                   {current.dayRows.map((row) => {
                     const inSchedule = activeDays.some((d) => d.toLowerCase() === row.dayName.toLowerCase());
                     const isHoliday = row.isHoliday === 'Y';
                     const isEditing = edit?.nDate === row.nDate;
+                    const hours = getHours(row);
                     const rowBg = inSchedule && isHoliday ? 'bg-blue-50'
                       : inSchedule ? 'bg-semantic-success-light'
                       : isHoliday ? 'bg-neutral-gray100' : '';
 
                     return (
                       <div key={row.nDate} className={`rounded-lg ${rowBg} ${isEditing ? 'ring-1 ring-primary-blue' : ''}`}>
-                        {/* Row header */}
                         <div className="flex items-center justify-between py-xs px-sm">
                           <span className="text-sm font-medium text-neutral-gray800 w-32">
                             {row.dayName} <span className="font-normal text-neutral-gray400 text-xs">{row.dateLabel}</span>
                           </span>
                           <div className="flex items-center gap-sm">
                             <span className="text-xs text-neutral-gray500 font-mono">
-                              {row.hoursDisplay || (isHoliday && !inSchedule ? 'Holiday' : '—')}
+                              {hours || (isHoliday && !inSchedule ? 'Holiday' : '—')}
                             </span>
-                            {!isEditing && (
+                            {canEdit && !isEditing && (
                               <button onClick={() => startEdit(row)}
                                 className="text-neutral-gray400 hover:text-primary-blue transition-colors"
                                 title="Edit hours">
@@ -290,8 +342,8 @@ const TimesheetPage = () => {
                           </div>
                         </div>
 
-                        {/* Inline editor */}
-                        {isEditing && (
+                        {/* Inline editor (Job 1 only) */}
+                        {isEditing && canEdit && (
                           <div className="px-sm pb-sm flex flex-col gap-sm">
                             {edit.loading ? (
                               <p className="text-xs text-neutral-gray400 py-xs">Loading current times...</p>
@@ -371,8 +423,6 @@ const TimesheetPage = () => {
           </div>
 
         </div>
-
-        <p className="text-center text-xs text-neutral-gray500 pb-lg">UCR Timesheet Bot — your schedule is saved locally</p>
       </div>
     </div>
   );
