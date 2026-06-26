@@ -77,11 +77,14 @@ const TimesheetPage = () => {
 
   const activeDays = DAYS_OF_WEEK.filter((d) => settings.schedule[d]?.length > 0);
 
-  const fetchCurrent = async () => {
+  const fetchCurrent = async (forceRefresh = false) => {
     setCurrentLoading(true);
     setSessionExpired(false);
     try {
-      const res = await fetch('/api/timesheet/current', { credentials: 'include' });
+      const res = await fetch('/api/timesheet/current', {
+        method: forceRefresh ? 'POST' : 'GET',
+        credentials: 'include',
+      });
       if (res.ok) {
         setCurrent(await res.json() as CurrentTimesheet);
         setLastRefreshed(new Date());
@@ -240,7 +243,7 @@ const TimesheetPage = () => {
                       {clearingAll ? 'Clearing...' : 'Clear all'}
                     </button>
                   )}
-                  <button onClick={fetchCurrent} disabled={currentLoading}
+                  <button onClick={() => fetchCurrent(true)} disabled={currentLoading}
                     className="text-neutral-gray400 hover:text-primary-blue transition-colors disabled:opacity-40">
                     <RefreshIcon />
                   </button>
