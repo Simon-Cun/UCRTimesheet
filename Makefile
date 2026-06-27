@@ -1,4 +1,4 @@
-.PHONY: setup dev lint format
+.PHONY: setup dev lint format check
 
 setup:
 	npm install
@@ -17,3 +17,7 @@ lint:
 format:
 	npm run format
 	cd frontend && npm run format
+
+check:
+	npx tsc --noEmit
+	cd frontend && npm run build

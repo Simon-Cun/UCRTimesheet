@@ -57,10 +57,7 @@ const LoginPage = () => {
     e.preventDefault();
     setError(null);
 
-    const result = await auth.importSession(
-      importAppCookie.trim(),
-      importUsername.trim()
-    );
+    const result = await auth.importSession(importAppCookie.trim(), importUsername.trim());
 
     if (result.success) {
       navigate('/', { replace: true });
@@ -154,7 +151,10 @@ const LoginPage = () => {
               </p>
 
               <button
-                onClick={() => { setShowImport(true); setError(null); }}
+                onClick={() => {
+                  setShowImport(true);
+                  setError(null);
+                }}
                 className="block w-full text-center text-white/40 lg:text-neutral-gray400 text-xs mt-sm hover:text-white/70 lg:hover:text-neutral-gray600 transition-colors"
               >
                 Import session from Playwright bot instead
@@ -164,15 +164,21 @@ const LoginPage = () => {
             <>
               <div className="hidden lg:block mb-lg">
                 <h2 className="text-2xl font-bold text-neutral-gray800">Import session</h2>
-                <p className="text-sm text-neutral-gray500 mt-1">Paste the values printed by the Playwright bot</p>
+                <p className="text-sm text-neutral-gray500 mt-1">
+                  Paste the values printed by the Playwright bot
+                </p>
               </div>
 
               <Card variant="premium" className="p-xl">
                 <form onSubmit={handleImport} noValidate>
                   <div className="mb-md p-sm rounded-md bg-neutral-gray100 lg:bg-neutral-gray50 border border-neutral-gray200 text-xs text-neutral-gray600 font-mono leading-relaxed">
-                    <p className="font-sans font-semibold text-neutral-gray700 mb-xs">Run the bot first:</p>
+                    <p className="font-sans font-semibold text-neutral-gray700 mb-xs">
+                      Run the bot first:
+                    </p>
                     <p>python timesheet_bot.py</p>
-                    <p className="mt-xs text-neutral-gray400">Approve Duo, then copy "App Cookie" from its output.</p>
+                    <p className="mt-xs text-neutral-gray400">
+                      Approve Duo, then copy "App Cookie" from its output.
+                    </p>
                   </div>
 
                   <Input
@@ -213,7 +219,10 @@ const LoginPage = () => {
               </Card>
 
               <button
-                onClick={() => { setShowImport(false); setError(null); }}
+                onClick={() => {
+                  setShowImport(false);
+                  setError(null);
+                }}
                 className="block w-full text-center text-white/40 lg:text-neutral-gray400 text-xs mt-xl hover:text-white/70 lg:hover:text-neutral-gray600 transition-colors"
               >
                 Back to sign in

@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install root deps
+        run: npm ci
+
+      - name: Install frontend deps
+        run: npm ci
+        working-directory: frontend
+
+      - name: Format check
+        run: npx prettier --check "api/**/*.ts" "backend/**/*.ts" "frontend/src/**/*.{ts,tsx}"
+
+      - name: Lint (backend)
+        run: npm run lint
+
+      - name: Lint (frontend)
+        run: npm run lint
+        working-directory: frontend
+
+      - name: Type-check (backend)
+        run: npx tsc --noEmit
+
+      - name: Build (frontend)
+        run: npm run build
+        working-directory: frontend

@@ -4,7 +4,8 @@
   "scripts": {
     "dev:backend": "tsx backend/server.ts",
     "lint": "eslint .",
-    "format": "prettier --write api backend"
+    "format": "prettier --write api backend",
+    "prepare": "husky"
   },
   "dependencies": {
     "@upstash/redis": "^1.38.0",
@@ -28,7 +29,16 @@
     "concurrently": "^10.0.3",
     "eslint": "^10.5.0",
     "globals": "^17.7.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.4.0",
+    "prettier": "^3.8.5",
     "tsx": "^4.15.0",
     "typescript": "^5.4.0"
+  },
+  "lint-staged": {
+    "**/*.{ts,tsx,js,json,css}": "prettier --check",
+    "api/**/*.ts": "eslint --fix",
+    "backend/**/*.ts": "eslint --fix",
+    "frontend/src/**/*.{ts,tsx}": "eslint --fix"
   }
 }

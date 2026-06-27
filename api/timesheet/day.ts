@@ -6,10 +6,11 @@ import { parseSession } from '../auth/login';
 import type { TimesheetInfo } from './current';
 
 const BASE = 'https://timesheet.ucr.edu/timesheet2';
-const UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36';
+const UA =
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36';
 
 export interface DayTimeEntry {
-  timeIn: string;   // "5" (12-hour, no leading zero)
+  timeIn: string; // "5" (12-hour, no leading zero)
   ampmIn: 'am' | 'pm';
   timeOut: string;
   ampmOut: 'am' | 'pm';
@@ -24,16 +25,19 @@ function toHour24(time: string, ampm: 'am' | 'pm'): number {
 
 function buildHoursString(entries: DayTimeEntry[], jobCode: string, payCode: string): string {
   const lines = entries.map(
-    (e) => `${toHour24(e.timeIn, e.ampmIn)}\t${toHour24(e.timeOut, e.ampmOut)}\tREG\t${payCode}\t\t${jobCode}\t\t`
+    (e) =>
+      `${toHour24(e.timeIn, e.ampmIn)}\t${toHour24(e.timeOut, e.ampmOut)}\tREG\t${payCode}\t\t${jobCode}\t\t`
   );
   lines.push(`-1\t-1\tREG\t${payCode}\t\t${jobCode}\t\t`);
   return lines.join('\n') + '\n';
 }
 
 function parsePayCode(html: string): string {
-  return html.match(/payCode['":\s=]+['"]?(\d+)['"]?/i)?.[1]
-    ?? html.match(/REG[^0-9]*(\d{2,3})/)?.[1]
-    ?? '97';
+  return (
+    html.match(/payCode['":\s=]+['"]?(\d+)['"]?/i)?.[1] ??
+    html.match(/REG[^0-9]*(\d{2,3})/)?.[1] ??
+    '97'
+  );
 }
 
 // Parse time entries from the InputHours form HTML.
@@ -44,22 +48,28 @@ function parseTimeEntries(html: string): DayTimeEntry[] {
 
   for (let i = 1; i <= 10; i++) {
     const timeIn =
-      html.match(new RegExp(`id=["']TimeIn${i}["'][^>]*value=["']([^"']+)["']`, 'i'))?.[1]?.trim() ??
+      html
+        .match(new RegExp(`id=["']TimeIn${i}["'][^>]*value=["']([^"']+)["']`, 'i'))?.[1]
+        ?.trim() ??
       html.match(new RegExp(`value=["']([^"']+)["'][^>]*id=["']TimeIn${i}["']`, 'i'))?.[1]?.trim();
 
     if (!timeIn || timeIn === '-1' || timeIn === '') break;
 
     const timeOut =
-      html.match(new RegExp(`id=["']TimeOut${i}["'][^>]*value=["']([^"']+)["']`, 'i'))?.[1]?.trim() ??
-      html.match(new RegExp(`value=["']([^"']+)["'][^>]*id=["']TimeOut${i}["']`, 'i'))?.[1]?.trim() ??
+      html
+        .match(new RegExp(`id=["']TimeOut${i}["'][^>]*value=["']([^"']+)["']`, 'i'))?.[1]
+        ?.trim() ??
+      html
+        .match(new RegExp(`value=["']([^"']+)["'][^>]*id=["']TimeOut${i}["']`, 'i'))?.[1]
+        ?.trim() ??
       '';
 
-    const ampmInIdx  = (i - 1) * 2 + 1;
+    const ampmInIdx = (i - 1) * 2 + 1;
     const ampmOutIdx = (i - 1) * 2 + 2;
 
     entries.push({
       timeIn,
-      ampmIn:  parseAmpm(html, ampmInIdx),
+      ampmIn: parseAmpm(html, ampmInIdx),
       timeOut,
       ampmOut: parseAmpm(html, ampmOutIdx),
     });
@@ -91,7 +101,9 @@ async function getInfo(appCookie: string, cookieHeader: string): Promise<Timeshe
   if (listResp.status !== 200) return null;
 
   const listHtml = listResp.data as string;
-  const m = listHtml.match(/go_biweekly_timesheet\s*\(\s*['"]([^'"]+)['"]\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
+  const m = listHtml.match(
+    /go_biweekly_timesheet\s*\(\s*['"]([^'"]+)['"]\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i
+  );
   if (!m) return null;
 
   const [, netId, key, year, month] = m;
@@ -99,27 +111,56 @@ async function getInfo(appCookie: string, cookieHeader: string): Promise<Timeshe
   const periodLabel = labelMatch?.[1]?.trim() ?? 'Current period';
 
   const updateParams = new URLSearchParams({
-    cookie: appCookie, v_user_netid: netId, v_timesheet_id: key,
-    v_year: year, v_month: month, v_style_hour: '8', v_style_code: '1', v_type: 'USER',
+    cookie: appCookie,
+    v_user_netid: netId,
+    v_timesheet_id: key,
+    v_year: year,
+    v_month: month,
+    v_style_hour: '8',
+    v_style_code: '1',
+    v_type: 'USER',
   });
-  await axios.post(`${BASE}/TIMESHEET_MAIN.update_cookie_User_list?${updateParams}`, null, { headers, validateStatus: () => true });
-  await axios.get(`${BASE}/Timesheet_biweekly_main.LoadTimesheet?cookie=${appCookie}`, { headers, maxRedirects: 5, validateStatus: () => true });
+  await axios.post(`${BASE}/TIMESHEET_MAIN.update_cookie_User_list?${updateParams}`, null, {
+    headers,
+    validateStatus: () => true,
+  });
+  await axios.get(`${BASE}/Timesheet_biweekly_main.LoadTimesheet?cookie=${appCookie}`, {
+    headers,
+    maxRedirects: 5,
+    validateStatus: () => true,
+  });
 
-  const sheetResp = await axios.get<string>(`${BASE}/Timesheet_BiWeekly_Main.Timesheet?cookie=${appCookie}`, { headers, validateStatus: () => true });
+  const sheetResp = await axios.get<string>(
+    `${BASE}/Timesheet_BiWeekly_Main.Timesheet?cookie=${appCookie}`,
+    { headers, validateStatus: () => true }
+  );
   const sheetHtml = sheetResp.data as string;
 
   const employeeId = sheetHtml.match(/vEmployeeID:\s*(\d+)/i)?.[1] ?? '';
-  const jobCode    = sheetHtml.match(/GetHours\s*\(\d+,\s*\d+,\s*'([^']+)'\)/i)?.[1] ?? '';
+  const jobCode = sheetHtml.match(/GetHours\s*\(\d+,\s*\d+,\s*'([^']+)'\)/i)?.[1] ?? '';
 
   const holidayMap = new Map<string, string>();
-  for (const hm of sheetHtml.matchAll(/id="isHoliday(\d+)"\s+value="([^"]+)"/gi)) holidayMap.set(hm[1], hm[2]);
+  for (const hm of sheetHtml.matchAll(/id="isHoliday(\d+)"\s+value="([^"]+)"/gi))
+    holidayMap.set(hm[1], hm[2]);
 
   const dayRows: TimesheetInfo['dayRows'] = [];
-  for (const rm of sheetHtml.matchAll(/<tr[^>]*>.*?<b>(SUNDAY|MONDAY|TUESDAY|WEDNESDAY|THURSDAY|FRIDAY|SATURDAY)[^<]*<\/b>.*?GetHours\s*\((\d+),/gis)) {
+  for (const rm of sheetHtml.matchAll(
+    /<tr[^>]*>.*?<b>(SUNDAY|MONDAY|TUESDAY|WEDNESDAY|THURSDAY|FRIDAY|SATURDAY)[^<]*<\/b>.*?GetHours\s*\((\d+),/gis
+  )) {
     const raw = rm[1];
     const nDate = rm[2];
-    const spanM = sheetHtml.match(new RegExp(`<span[^>]*class="current_span"[^>]*id="[^"]*-${nDate}"[^>]*>([\\s\\S]*?)<\\/span>`, 'i'));
-    const spanText = spanM ? spanM[1].replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim() : '';
+    const spanM = sheetHtml.match(
+      new RegExp(
+        `<span[^>]*class="current_span"[^>]*id="[^"]*-${nDate}"[^>]*>([\\s\\S]*?)<\\/span>`,
+        'i'
+      )
+    );
+    const spanText = spanM
+      ? spanM[1]
+          .replace(/<[^>]+>/g, '')
+          .replace(/\s+/g, ' ')
+          .trim()
+      : '';
     dayRows.push({
       dayName: raw.charAt(0) + raw.slice(1).toLowerCase(),
       nDate,
@@ -129,32 +170,52 @@ async function getInfo(appCookie: string, cookieHeader: string): Promise<Timeshe
     });
   }
 
-  const jsVar = (name: string, def: string) => sheetHtml.match(new RegExp(`var ${name}\\s*=\\s*"([^"]+)"`, 'i'))?.[1] ?? def;
+  const jsVar = (name: string, def: string) =>
+    sheetHtml.match(new RegExp(`var ${name}\\s*=\\s*"([^"]+)"`, 'i'))?.[1] ?? def;
   const flags = {
-    vHasSKL: jsVar('sHasSKL', 'N'), vHasVAC: jsVar('sHasVAC', 'N'),
-    vHasCTA: jsVar('sHasCTA', 'N'), vHasPTO: jsVar('sHasPTO', 'N'),
-    vHasHun: jsVar('sHasHUN', 'N'), vOvertime: jsVar('sOvertime', 'N'),
+    vHasSKL: jsVar('sHasSKL', 'N'),
+    vHasVAC: jsVar('sHasVAC', 'N'),
+    vHasCTA: jsVar('sHasCTA', 'N'),
+    vHasPTO: jsVar('sHasPTO', 'N'),
+    vHasHun: jsVar('sHasHUN', 'N'),
+    vOvertime: jsVar('sOvertime', 'N'),
     vEmployeeType: jsVar('sEmployeeType', 'BX'),
-    vOnLeave: 'N', vCurtailmentPeriod: 'N', vIsGSR: 'N', vIsASE: 'Y',
+    vOnLeave: 'N',
+    vCurtailmentPeriod: 'N',
+    vIsGSR: 'N',
+    vIsASE: 'Y',
   };
 
   return { appCookie, key, netId, year, month, periodLabel, employeeId, jobCode, flags, dayRows };
 }
 
-async function callInputHours(appCookie: string, headers: Record<string, string>, info: TimesheetInfo, nDate: string) {
+async function callInputHours(
+  appCookie: string,
+  headers: Record<string, string>,
+  info: TimesheetInfo,
+  nDate: string
+) {
   const dayRow = info.dayRows.find((r) => r.nDate === nDate);
   return axios.post<string>(
     `${BASE}/timesheet_biweekly_main.InputHours`,
     new URLSearchParams({
-      cookie: appCookie, nDate, key: info.key,
+      cookie: appCookie,
+      nDate,
+      key: info.key,
       vEmployeeID: info.employeeId,
-      vHasSKL: info.flags.vHasSKL, vHasVAC: info.flags.vHasVAC,
-      vHasCTA: info.flags.vHasCTA, vHasPTO: info.flags.vHasPTO,
-      vHasHun: info.flags.vHasHun, vOvertime: info.flags.vOvertime,
-      vEmployeeType: info.flags.vEmployeeType, vOnLeave: info.flags.vOnLeave,
-      vIsHoliday: dayRow?.isHoliday ?? 'N', vJob: info.jobCode,
+      vHasSKL: info.flags.vHasSKL,
+      vHasVAC: info.flags.vHasVAC,
+      vHasCTA: info.flags.vHasCTA,
+      vHasPTO: info.flags.vHasPTO,
+      vHasHun: info.flags.vHasHun,
+      vOvertime: info.flags.vOvertime,
+      vEmployeeType: info.flags.vEmployeeType,
+      vOnLeave: info.flags.vOnLeave,
+      vIsHoliday: dayRow?.isHoliday ?? 'N',
+      vJob: info.jobCode,
       vCurtailmentPeriod: info.flags.vCurtailmentPeriod,
-      vIsGSR: info.flags.vIsGSR, vIsASE: info.flags.vIsASE,
+      vIsGSR: info.flags.vIsGSR,
+      vIsASE: info.flags.vIsASE,
     }).toString(),
     { headers, validateStatus: () => true }
   );
@@ -167,11 +228,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!cookies['ts_session']) return res.status(401).json({ error: 'SESSION_EXPIRED' });
 
   let session: ReturnType<typeof parseSession>;
-  try { session = parseSession(cookies['ts_session']); }
-  catch { return res.status(401).json({ error: 'SESSION_EXPIRED' }); }
+  try {
+    session = parseSession(cookies['ts_session']);
+  } catch {
+    return res.status(401).json({ error: 'SESSION_EXPIRED' });
+  }
 
   const { appCookie, cookieHeader } = session;
-  const formHeaders = { Cookie: cookieHeader, 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': UA };
+  const formHeaders = {
+    Cookie: cookieHeader,
+    'Content-Type': 'application/x-www-form-urlencoded',
+    'User-Agent': UA,
+  };
 
   try {
     const info = await getInfo(appCookie, cookieHeader);
@@ -195,13 +263,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const inputResp = await callInputHours(appCookie, formHeaders, info, nDate);
       const payCode = parsePayCode(inputResp.data as string);
 
-      const vHoursString = (entries && entries.length > 0)
-        ? buildHoursString(entries, info.jobCode, payCode)
-        : `-1\t-1\tREG\t${payCode}\t\t${info.jobCode}\t\t\n`;
+      const vHoursString =
+        entries && entries.length > 0
+          ? buildHoursString(entries, info.jobCode, payCode)
+          : `-1\t-1\tREG\t${payCode}\t\t${info.jobCode}\t\t\n`;
 
       await axios.post(
         `${BASE}/timesheet_biweekly_main.SaveTimesheetHours`,
-        new URLSearchParams({ key: info.key, cookie: appCookie, vDate: nDate, vHoursString, vDayString: '' }).toString(),
+        new URLSearchParams({
+          key: info.key,
+          cookie: appCookie,
+          vDate: nDate,
+          vHoursString,
+          vDayString: '',
+        }).toString(),
         { headers: formHeaders, validateStatus: () => true }
       );
       await axios.post(

@@ -3,14 +3,14 @@ import axios from 'axios';
 import { parse as parseCookies } from 'cookie';
 import { applyCors } from '../_cors';
 import { parseSession } from '../auth/login';
-import currentHandler, { type TimesheetInfo } from './current';
+import { type TimesheetInfo } from './current';
 
 const BASE = 'https://timesheet.ucr.edu/timesheet2';
 
 export interface ScheduleEntry {
-  timeIn: string;   // "05:00"
+  timeIn: string; // "05:00"
   ampmIn: 'am' | 'pm';
-  timeOut: string;  // "07:00"
+  timeOut: string; // "07:00"
   ampmOut: 'am' | 'pm';
 }
 
@@ -40,11 +40,7 @@ function toHour24(time: string, ampm: 'am' | 'pm'): number {
 //   {inHour24}\t{outHour24}\tREG\t{payCode}\t\t{jobCode}\t\t\n
 //   -1\t-1\tREG\t{payCode}\t\t{jobCode}\t\t\n
 // The second row is always an empty-sentinel row the server expects.
-function buildHoursString(
-  entries: ScheduleEntry[],
-  jobCode: string,
-  payCode: string
-): string {
+function buildHoursString(entries: ScheduleEntry[], jobCode: string, payCode: string): string {
   const lines: string[] = [];
   for (const e of entries) {
     const inH = toHour24(e.timeIn, e.ampmIn);
@@ -60,10 +56,8 @@ function buildHoursString(
 // The modal form typically has a hidden input like <input name="payCode" value="97">
 // or the pay code is embedded in the hours string template in the JS.
 function parsePayCode(html: string): string {
-  const match =
-    html.match(/payCode['":\s=]+['"]?(\d+)['"]?/i) ??
-    html.match(/REG[^0-9]*(\d{2,3})/);   // fallback: first 2-3 digit number after "REG"
-  return match?.[1] ?? '97';             // 97 is this employee's pay code per traffic capture
+  const match = html.match(/payCode['":\s=]+['"]?(\d+)['"]?/i) ?? html.match(/REG[^0-9]*(\d{2,3})/); // fallback: first 2-3 digit number after "REG"
+  return match?.[1] ?? '97'; // 97 is this employee's pay code per traffic capture
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -102,18 +96,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(503).json({ error: 'Could not load timesheet. Session may have expired.' });
     }
 
-    const { key, netId, year, month, employeeId, jobCode, flags, dayRows } = info;
+    const { key, employeeId, jobCode, flags, dayRows } = info;
     const log: SubmitLog[] = [];
 
     // ── Phase 2: Submit entries for each scheduled day ──
     for (const [dayName, entries] of Object.entries(schedule)) {
       // Find all occurrences of this day in the current biweekly period
-      const occurrences = dayRows.filter(
-        (r) => r.dayName.toLowerCase() === dayName.toLowerCase()
-      );
+      const occurrences = dayRows.filter((r) => r.dayName.toLowerCase() === dayName.toLowerCase());
 
       if (occurrences.length === 0) {
-        log.push({ day: dayName, nDate: '-', status: 'error', message: 'Day not found in timesheet' });
+        log.push({
+          day: dayName,
+          nDate: '-',
+          status: 'error',
+          message: 'Day not found in timesheet',
+        });
         continue;
       }
 
@@ -171,7 +168,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           );
 
           const saveBody = (saveHoursResp.data as string).slice(0, 200);
-          log.push({ day: dayName, nDate, status: 'ok', message: `HTTP ${saveHoursResp.status}: ${saveBody}` });
+          log.push({
+            day: dayName,
+            nDate,
+            status: 'ok',
+            message: `HTTP ${saveHoursResp.status}: ${saveBody}`,
+          });
         } catch (err: unknown) {
           const msg = err instanceof Error ? err.message : String(err);
           log.push({ day: dayName, nDate, status: 'error', message: msg });
@@ -209,7 +211,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
 // Run the same logic as current.ts without going through HTTP.
 // Avoids a self-referential HTTP call in serverless/local environments.
-async function fetchTimesheetInfo(appCookie: string, cookieHeader: string): Promise<TimesheetInfo | null> {
+async function fetchTimesheetInfo(
+  appCookie: string,
+  cookieHeader: string
+): Promise<TimesheetInfo | null> {
   const headers = {
     Cookie: cookieHeader,
     'User-Agent':
@@ -239,12 +244,31 @@ async function fetchTimesheetInfo(appCookie: string, cookieHeader: string): Prom
   const periodLabel = labelMatch ? labelMatch[1].trim() : 'Current period';
 
   // Select the timesheet — params go in URL query string, POST body is empty
-  const updateParams = new URLSearchParams({ cookie: appCookie, v_user_netid: netId, v_timesheet_id: key, v_year: year, v_month: month, v_style_hour: '8', v_style_code: '1', v_type: 'USER' });
-  await axios.post(`${BASE}/TIMESHEET_MAIN.update_cookie_User_list?${updateParams}`, null, { headers, validateStatus: () => true });
+  const updateParams = new URLSearchParams({
+    cookie: appCookie,
+    v_user_netid: netId,
+    v_timesheet_id: key,
+    v_year: year,
+    v_month: month,
+    v_style_hour: '8',
+    v_style_code: '1',
+    v_type: 'USER',
+  });
+  await axios.post(`${BASE}/TIMESHEET_MAIN.update_cookie_User_list?${updateParams}`, null, {
+    headers,
+    validateStatus: () => true,
+  });
 
   // Load biweekly sheet
-  await axios.get(`${BASE}/Timesheet_biweekly_main.LoadTimesheet?cookie=${appCookie}`, { headers, maxRedirects: 5, validateStatus: () => true });
-  const sheetResp = await axios.get<string>(`${BASE}/Timesheet_BiWeekly_Main.Timesheet?cookie=${appCookie}`, { headers, validateStatus: () => true });
+  await axios.get(`${BASE}/Timesheet_biweekly_main.LoadTimesheet?cookie=${appCookie}`, {
+    headers,
+    maxRedirects: 5,
+    validateStatus: () => true,
+  });
+  const sheetResp = await axios.get<string>(
+    `${BASE}/Timesheet_BiWeekly_Main.Timesheet?cookie=${appCookie}`,
+    { headers, validateStatus: () => true }
+  );
 
   // Import and call the parser from current.ts
   // Re-implement inline to avoid circular import issues with the cheerio parsing
@@ -265,7 +289,13 @@ async function fetchTimesheetInfo(appCookie: string, cookieHeader: string): Prom
 }
 
 function parseDayRowsFromHtml(html: string) {
-  const rows: Array<{ dayName: string; nDate: string; isHoliday: string; hoursDisplay: string; dateLabel: string }> = [];
+  const rows: Array<{
+    dayName: string;
+    nDate: string;
+    isHoliday: string;
+    hoursDisplay: string;
+    dateLabel: string;
+  }> = [];
 
   // Build isHoliday map from hidden inputs
   const holidayMap = new Map<string, string>();
@@ -274,12 +304,19 @@ function parseDayRowsFromHtml(html: string) {
   }
 
   // Match each row: day name in <b>DAY ...</b> followed by GetHours(nDate, ...) onclick
-  const rowPattern = /<tr[^>]*>.*?<b>(SUNDAY|MONDAY|TUESDAY|WEDNESDAY|THURSDAY|FRIDAY|SATURDAY)[^<]*<\/b>.*?GetHours\s*\((\d+),/gis;
+  const rowPattern =
+    /<tr[^>]*>.*?<b>(SUNDAY|MONDAY|TUESDAY|WEDNESDAY|THURSDAY|FRIDAY|SATURDAY)[^<]*<\/b>.*?GetHours\s*\((\d+),/gis;
   for (const m of html.matchAll(rowPattern)) {
     const raw = m[1];
     const dayName = raw.charAt(0) + raw.slice(1).toLowerCase();
     const nDate = m[2];
-    rows.push({ dayName, nDate, isHoliday: holidayMap.get(nDate) ?? 'N', hoursDisplay: '', dateLabel: '' });
+    rows.push({
+      dayName,
+      nDate,
+      isHoliday: holidayMap.get(nDate) ?? 'N',
+      hoursDisplay: '',
+      dateLabel: '',
+    });
   }
 
   return rows;

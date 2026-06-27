@@ -4,10 +4,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 // don't need CORS headers — the browser handles those automatically.
 export function applyCors(req: VercelRequest, res: VercelResponse): boolean {
   const origin = req.headers.origin ?? '';
-  if (
-    origin.startsWith('chrome-extension://') ||
-    origin.startsWith('moz-extension://')
-  ) {
+  if (origin.startsWith('chrome-extension://') || origin.startsWith('moz-extension://')) {
     res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Access-Control-Allow-Credentials', 'true');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');

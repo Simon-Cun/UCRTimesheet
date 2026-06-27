@@ -2,8 +2,8 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { applyCors } from '../_cors';
 
 interface ImportPayload {
-  appCookie: string;   // the number from ?cookie=XXXXXX in the URL
-  cookies: string;     // raw "name=value; name2=value2" string from Playwright
+  appCookie: string; // the number from ?cookie=XXXXXX in the URL
+  cookies: string; // raw "name=value; name2=value2" string from Playwright
   username: string;
 }
 
@@ -20,7 +20,8 @@ function buildSessionCookie(value: string): string {
 
 export default function handler(req: VercelRequest, res: VercelResponse) {
   if (applyCors(req, res)) return;
-  if (req.method !== 'POST') return res.status(405).json({ success: false, error: 'Method not allowed' });
+  if (req.method !== 'POST')
+    return res.status(405).json({ success: false, error: 'Method not allowed' });
 
   const { appCookie, cookies, username } = (req.body ?? {}) as Partial<ImportPayload>;
 
@@ -29,7 +30,9 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   if (!/^\d+$/.test(appCookie.trim())) {
-    return res.status(400).json({ success: false, error: 'appCookie must be a numeric session ID' });
+    return res
+      .status(400)
+      .json({ success: false, error: 'appCookie must be a numeric session ID' });
   }
 
   const session = {

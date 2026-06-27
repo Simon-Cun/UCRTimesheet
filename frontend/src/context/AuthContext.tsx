@@ -1,4 +1,12 @@
-import { ReactNode, createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import {
+  ReactNode,
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 import type { AuthState, LoginResult, StoredAuth, StoredCredentials } from '@/types/auth';
 import { STORAGE_KEYS } from '@/utils/constants';
 
@@ -66,7 +74,10 @@ const AuthProvider = ({ children }: { children: ReactNode }) => {
         .then((r) => r.json())
         .then((data: { success: boolean; username?: string }) => {
           if (data.success) {
-            const newAuth: StoredAuth = { isAuthenticated: true, username: data.username ?? username };
+            const newAuth: StoredAuth = {
+              isAuthenticated: true,
+              username: data.username ?? username,
+            };
             saveStoredAuth(newAuth);
             setState({ isAuthenticated: true, isLoading: false, username: newAuth.username });
           }
@@ -201,7 +212,9 @@ const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [login, logout]);
 
   return (
-    <AuthContext.Provider value={{ ...state, isInitializing, login, importSession, logout, silentReAuth }}>
+    <AuthContext.Provider
+      value={{ ...state, isInitializing, login, importSession, logout, silentReAuth }}
+    >
       {children}
     </AuthContext.Provider>
   );

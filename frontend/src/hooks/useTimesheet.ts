@@ -35,7 +35,12 @@ export function useTimesheet(): UseTimesheetReturn {
           return { success: false, error: 'Session expired' };
         }
 
-        const data = (await res.json()) as { success?: boolean; error?: string; message?: string; log?: SaveLog[] };
+        const data = (await res.json()) as {
+          success?: boolean;
+          error?: string;
+          message?: string;
+          log?: SaveLog[];
+        };
 
         if (!res.ok) {
           const msg = data.message ?? data.error ?? 'Save failed';
@@ -55,7 +60,10 @@ export function useTimesheet(): UseTimesheetReturn {
     [auth]
   );
 
-  const reset = useCallback(() => { setStatus('idle'); setError(null); }, []);
+  const reset = useCallback(() => {
+    setStatus('idle');
+    setError(null);
+  }, []);
 
   return { status, error, save, reset };
 }

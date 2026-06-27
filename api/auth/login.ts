@@ -10,7 +10,7 @@ const CAS_LOGIN = 'https://auth.ucr.edu/cas/login';
 const CAS_SERVICE_URL = `${TIMESHEET_BASE}/TIMESHEET_MAIN.MAIN_CAS`;
 
 interface TimesheetSession {
-  appCookie: string;   // APEX session ID passed as ?cookie= param on every request
+  appCookie: string; // APEX session ID passed as ?cookie= param on every request
   cookieHeader: string; // serialized HTTP cookies from the auth flow
   username: string;
 }
@@ -32,7 +32,8 @@ export function parseSession(raw: string): TimesheetSession {
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (applyCors(req, res)) return;
-  if (req.method !== 'POST') return res.status(405).json({ success: false, error: 'Method not allowed' });
+  if (req.method !== 'POST')
+    return res.status(405).json({ success: false, error: 'Method not allowed' });
 
   const { username, password } = (req.body ?? {}) as { username?: string; password?: string };
   if (!username || !password) {
@@ -74,7 +75,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const execution = match[1];
 
     // Step 3: Submit credentials to CAS
-    const params = new URLSearchParams({ username, password, execution, _eventId: 'submit', geolocation: '' });
+    const params = new URLSearchParams({
+      username,
+      password,
+      execution,
+      _eventId: 'submit',
+      geolocation: '',
+    });
     const submitResp = await client.post<string>(casUrl, params.toString(), {
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
@@ -136,7 +143,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         });
       }
       console.error('[login] No appCookie in HTML. Status:', afterDuoResp.status);
-      return res.status(502).json({ success: false, error: 'Could not establish timesheet session' });
+      return res
+        .status(502)
+        .json({ success: false, error: 'Could not establish timesheet session' });
     }
     const appCookie = appCookieMatch[1];
 

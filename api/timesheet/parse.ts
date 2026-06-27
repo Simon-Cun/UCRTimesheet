@@ -5,9 +5,9 @@ import * as cheerio from 'cheerio';
 import { applyCors } from '../_cors';
 
 export interface JobInfo {
-  jobKey: string;   // e.g. '40950425:0:D01003'
-  jobCode: string;  // e.g. '40950425'
-  label: string;    // e.g. 'Job 1 - 40950425'
+  jobKey: string; // e.g. '40950425:0:D01003'
+  jobCode: string; // e.g. '40950425'
+  label: string; // e.g. 'Job 1 - 40950425'
   position: string; // e.g. 'TUT-NON GSHIP'
 }
 
@@ -36,7 +36,7 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
 
 function parseListPage(html: string, appCookie: string, username: string) {
   const callMatch = html.match(
-    /go_biweekly_timesheet\s*\(\s*['"]([^'"]+)['"]\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i,
+    /go_biweekly_timesheet\s*\(\s*['"]([^'"]+)['"]\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i
   );
   if (!callMatch) return null;
 
@@ -55,10 +55,13 @@ function escapeRe(s: string) {
 
 function extractJobHoursDisplay(html: string, jobKey: string, nDate: string): string {
   const m = html.match(
-    new RegExp(`id="Job-${escapeRe(jobKey)}-${nDate}"[^>]*>([\\s\\S]*?)<\\/span>`, 'i'),
+    new RegExp(`id="Job-${escapeRe(jobKey)}-${nDate}"[^>]*>([\\s\\S]*?)<\\/span>`, 'i')
   );
   if (!m) return '';
-  const text = m[1].replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+  const text = m[1]
+    .replace(/<[^>]+>/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
   return /click to add/i.test(text) ? '' : text;
 }
 
@@ -70,11 +73,17 @@ function parseSheetRows(html: string) {
     html.match(new RegExp(`var ${name}\\s*=\\s*"([^"]+)"`, 'i'))?.[1] ?? def;
 
   const flags = {
-    vHasSKL: jsVar('sHasSKL', 'N'), vHasVAC: jsVar('sHasVAC', 'N'),
-    vHasCTA: jsVar('sHasCTA', 'N'), vHasPTO: jsVar('sHasPTO', 'N'),
-    vHasHun: jsVar('sHasHUN', 'N'), vOvertime: jsVar('sOvertime', 'N'),
+    vHasSKL: jsVar('sHasSKL', 'N'),
+    vHasVAC: jsVar('sHasVAC', 'N'),
+    vHasCTA: jsVar('sHasCTA', 'N'),
+    vHasPTO: jsVar('sHasPTO', 'N'),
+    vHasHun: jsVar('sHasHUN', 'N'),
+    vOvertime: jsVar('sOvertime', 'N'),
     vEmployeeType: jsVar('sEmployeeType', 'BX'),
-    vOnLeave: 'N', vCurtailmentPeriod: 'N', vIsGSR: 'N', vIsASE: 'Y',
+    vOnLeave: 'N',
+    vCurtailmentPeriod: 'N',
+    vIsGSR: 'N',
+    vIsASE: 'Y',
   };
 
   const holidayMap = new Map<string, string>();
@@ -116,7 +125,9 @@ function parseSheetRows(html: string) {
     const boldText = $(row).find('td.dayOfMonth b').text().trim();
     if (!boldText) return;
 
-    const dayNameMatch = boldText.match(/^(SUNDAY|MONDAY|TUESDAY|WEDNESDAY|THURSDAY|FRIDAY|SATURDAY)/i);
+    const dayNameMatch = boldText.match(
+      /^(SUNDAY|MONDAY|TUESDAY|WEDNESDAY|THURSDAY|FRIDAY|SATURDAY)/i
+    );
     if (!dayNameMatch) return;
     const dayName = dayNameMatch[1].charAt(0) + dayNameMatch[1].slice(1).toLowerCase();
 
@@ -128,29 +139,35 @@ function parseSheetRows(html: string) {
 
     const isHoliday = holidayMap.get(nDate) ?? 'N';
 
-    const dateMatch = boldText.slice(dayNameMatch[1].length).trim().match(/([A-Z]+)\s+(\d+)/i);
+    const dateMatch = boldText
+      .slice(dayNameMatch[1].length)
+      .trim()
+      .match(/([A-Z]+)\s+(\d+)/i);
     const dateLabel = dateMatch
       ? `${dateMatch[1].charAt(0).toUpperCase() + dateMatch[1].slice(1).toLowerCase()} ${parseInt(dateMatch[2], 10)}`
       : '';
 
     // Per-job hours
     const jobHours: Record<string, string> = {};
-    $(row).find('td[class^="job"]').each((jobIdx, cell) => {
-      const onclick = $(cell).attr('onclick') ?? '';
-      const m = onclick.match(/GetHours\s*\(\d+,\s*\d+,\s*'([^']+)'\)/i);
-      if (!m) return;
-      const jobKey = m[1];
-      const jobCode = jobKey.split(':')[0];
+    $(row)
+      .find('td[class^="job"]')
+      .each((jobIdx, cell) => {
+        const onclick = $(cell).attr('onclick') ?? '';
+        const m = onclick.match(/GetHours\s*\(\d+,\s*\d+,\s*'([^']+)'\)/i);
+        if (!m) return;
+        const jobKey = m[1];
+        const jobCode = jobKey.split(':')[0];
 
-      // Fill job metadata on first encounter
-      while (jobs.length <= jobIdx) jobs.push({ jobKey: '', jobCode: '', label: '', position: '' });
-      if (!jobs[jobIdx].jobKey) {
-        jobs[jobIdx].jobKey = jobKey;
-        jobs[jobIdx].jobCode = jobCode;
-      }
+        // Fill job metadata on first encounter
+        while (jobs.length <= jobIdx)
+          jobs.push({ jobKey: '', jobCode: '', label: '', position: '' });
+        if (!jobs[jobIdx].jobKey) {
+          jobs[jobIdx].jobKey = jobKey;
+          jobs[jobIdx].jobCode = jobCode;
+        }
 
-      jobHours[jobKey] = extractJobHoursDisplay(html, jobKey, nDate);
-    });
+        jobHours[jobKey] = extractJobHoursDisplay(html, jobKey, nDate);
+      });
 
     const hoursDisplay = jobs[0]?.jobKey ? (jobHours[jobs[0].jobKey] ?? '') : '';
 
