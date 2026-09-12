@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
-import LoginPage from './LoginPage';
+import LoginPage from '@/pages/LoginPage';
 import { useAuth } from '@/context/AuthContext';
 import { STORAGE_KEYS } from '@/utils/constants';
 

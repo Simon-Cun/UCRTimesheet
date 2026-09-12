@@ -1,5 +1,5 @@
 import { act, renderHook } from '@testing-library/react';
-import { useTimesheet } from './useTimesheet';
+import { useTimesheet } from '@/hooks/useTimesheet';
 import { useAuth } from '@/context/AuthContext';
 import type { Schedule } from '@/types/timesheet';
 

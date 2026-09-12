@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import BottomNav from './BottomNav';
+import BottomNav from '@/components/layout/BottomNav';
 
 describe('BottomNav', () => {
   it('renders Home and Settings links', () => {

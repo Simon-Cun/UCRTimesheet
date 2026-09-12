@@ -1,6 +1,6 @@
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { SettingsProvider, useSettings } from './SettingsContext';
+import { SettingsProvider, useSettings } from '@/context/SettingsContext';
 import { STORAGE_KEYS } from '@/utils/constants';
 import type { Schedule } from '@/types/timesheet';
 

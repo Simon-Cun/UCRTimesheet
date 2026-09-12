@@ -1,6 +1,6 @@
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { AuthProvider, useAuth } from './AuthContext';
+import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { STORAGE_KEYS } from '@/utils/constants';
 
 const jsonResponse = (body: unknown, ok = true, status = ok ? 200 : 400) => ({

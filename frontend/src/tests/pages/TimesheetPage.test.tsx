@@ -1,6 +1,6 @@
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import TimesheetPage from './TimesheetPage';
+import TimesheetPage from '@/pages/TimesheetPage';
 import { useSettings } from '@/context/SettingsContext';
 import { useTimesheet } from '@/hooks/useTimesheet';
 import type { Schedule } from '@/types/timesheet';
