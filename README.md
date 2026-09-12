@@ -7,7 +7,7 @@ Automates UCR biweekly timesheet submission. Set your weekly schedule once — t
 Two parts work together:
 
 1. **Web app** (this repo) — a React frontend + serverless API deployed on Vercel. Handles the UCR timesheet UI, schedule storage, and direct HTTP calls to `timesheet.ucr.edu`.
-2. **Chrome extension** ([separate repo](../extension)) — detects when you visit `timesheet.ucr.edu`, captures your session, and imports it into the web app automatically. No manual login required.
+2. **Chrome extension** ([separate repo](../extension), [Chrome Web Store](https://chromewebstore.google.com/detail/ucr-timesheet/pmpkookkaiocfekpcamlgkdbnjhpmlph)) — detects when you visit `timesheet.ucr.edu`, captures your session, and imports it into the web app automatically. No manual login required.
 
 ### Auth flow
 
@@ -74,6 +74,7 @@ GitHub Actions runs on every push and PR:
 
 1. ESLint — backend and frontend
 2. TypeScript type-check — backend
-3. Frontend build — includes `tsc` + Vite bundle
+3. Jest unit tests — frontend (coverage floor: 80%)
+4. Frontend build — includes `tsc` + Vite bundle
 
 Pre-commit hooks (Husky + lint-staged) run Prettier and ESLint on staged files before every commit.
